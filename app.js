@@ -1,4 +1,4 @@
-const templates = [
+const defaultTemplates = [
   {
     id: "50lan",
     type: "drink",
@@ -114,7 +114,8 @@ function createEmptyState() {
     deadline: "",
     locked: false,
     menu: [],
-    orders: []
+    orders: [],
+    templates: []
   };
 }
 
@@ -132,6 +133,9 @@ const el = {
   shopName: document.querySelector("#shopName"),
   deadline: document.querySelector("#deadline"),
   templateButtons: document.querySelector("#templateButtons"),
+  saveTemplateBtn: document.querySelector("#saveTemplateBtn"),
+  deleteTemplateBtn: document.querySelector("#deleteTemplateBtn"),
+  templateStatus: document.querySelector("#templateStatus"),
   lockBtn: document.querySelector("#lockBtn"),
   unlockBtn: document.querySelector("#unlockBtn"),
   resetBtn: document.querySelector("#resetBtn"),
@@ -388,7 +392,8 @@ function shareState() {
     shopName: state.shopName,
     deadline: state.deadline,
     locked: state.locked,
-    menu: state.menu
+    menu: state.menu,
+    templates: state.templates || []
   };
 }
 
@@ -404,9 +409,13 @@ function getReturnUrl(order) {
   return url.href;
 }
 
+function allTemplates() {
+  return [...(state.templates || []), ...defaultTemplates];
+}
+
 function findTemplate(name, type = state.type) {
   const normalized = name.trim().toLowerCase();
-  return templates.find((template) => {
+  return allTemplates().find((template) => {
     return template.type === type && template.names.some((entry) => normalized.includes(entry.toLowerCase()));
   });
 }
@@ -450,6 +459,61 @@ function addCustomItem(name, price) {
   persist();
 }
 
+function normalizeMenuForTemplate(menu) {
+  return menu.map((item) => [item.name, Number(item.price) || 0]);
+}
+
+function saveCurrentTemplate() {
+  const shopName = state.shopName.trim();
+  if (!shopName || !state.menu.length) {
+    toast("請先輸入店家並新增菜單");
+    return;
+  }
+
+  const nextTemplate = {
+    id: `custom-${shopName.toLowerCase()}-${Date.now()}`,
+    custom: true,
+    type: state.type,
+    names: [shopName],
+    items: normalizeMenuForTemplate(state.menu)
+  };
+
+  const normalizedName = shopName.toLowerCase();
+  const existingBuiltIn = defaultTemplates.some((template) => {
+    return template.type === state.type && template.names.some((name) => name.toLowerCase() === normalizedName);
+  });
+
+  state.templates = (state.templates || []).filter((template) => {
+    return !(template.type === state.type && template.names.some((name) => name.toLowerCase() === normalizedName));
+  });
+
+  if (!existingBuiltIn) {
+    state.templates.push(nextTemplate);
+  } else {
+    nextTemplate.id = `custom-${shopName.toLowerCase()}-override`;
+    state.templates.push(nextTemplate);
+  }
+
+  render();
+  persist();
+  toast("已存成常用店家");
+}
+
+function deleteCurrentTemplate() {
+  const normalizedName = state.shopName.trim().toLowerCase();
+  const before = (state.templates || []).length;
+  state.templates = (state.templates || []).filter((template) => {
+    return !(template.type === state.type && template.names.some((name) => name.toLowerCase() === normalizedName));
+  });
+  if (state.templates.length === before) {
+    toast("這不是自訂店家");
+    return;
+  }
+  render();
+  persist();
+  toast("已刪除自訂店家");
+}
+
 function upsertOrder(orders, order) {
   const exists = orders.some((item) => item.id === order.id);
   if (exists) {
@@ -460,8 +524,15 @@ function upsertOrder(orders, order) {
 
 function renderTemplates() {
   el.templateButtons.innerHTML = "";
-  templates
+  const seen = new Set();
+  allTemplates()
     .filter((template) => template.type === state.type)
+    .filter((template) => {
+      const key = `${template.type}:${template.names[0].toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .forEach((template) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -470,6 +541,16 @@ function renderTemplates() {
       button.addEventListener("click", () => setTemplate(template));
       el.templateButtons.append(button);
     });
+}
+
+function renderTemplateStatus() {
+  const count = (state.templates || []).filter((template) => template.type === state.type).length;
+  el.templateStatus.textContent = count ? `自訂常用店家 ${count} 間，已跟訂單一起同步` : "可把目前店家與 Menu 存成常用店家";
+  const normalizedName = state.shopName.trim().toLowerCase();
+  const canDelete = (state.templates || []).some((template) => {
+    return template.type === state.type && template.names.some((name) => name.toLowerCase() === normalizedName);
+  });
+  el.deleteTemplateBtn.disabled = !canDelete || state.locked;
 }
 
 function renderMenu() {
@@ -581,7 +662,9 @@ function render() {
   el.lockBtn.disabled = state.locked || !state.shopName || !state.menu.length;
   el.unlockBtn.disabled = !state.locked;
   el.addItemBtn.disabled = state.locked;
+  el.saveTemplateBtn.disabled = state.locked || !state.shopName || !state.menu.length;
   renderTemplates();
+  renderTemplateStatus();
   renderMenu();
   renderOrderOptions();
   renderOrders();
@@ -661,7 +744,9 @@ el.unlockBtn.addEventListener("click", () => {
 
 el.resetBtn.addEventListener("click", () => {
   if (!confirm("清空今日店家與訂單？")) return;
+  const savedTemplates = state.templates || [];
   state = createEmptyState();
+  state.templates = savedTemplates;
   lastOrder = null;
   render();
   persist();
@@ -685,6 +770,9 @@ el.clearGasBtn.addEventListener("click", () => {
   renderRemoteStatus();
   render();
 });
+
+el.saveTemplateBtn.addEventListener("click", saveCurrentTemplate);
+el.deleteTemplateBtn.addEventListener("click", deleteCurrentTemplate);
 
 el.addItemBtn.addEventListener("click", () => {
   el.newItemName.value = "";

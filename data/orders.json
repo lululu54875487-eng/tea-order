@@ -1,0 +1,10 @@
+{
+  "orderId": "today-order",
+  "type": "drink",
+  "shopName": "",
+  "deadline": "",
+  "locked": false,
+  "menu": [],
+  "orders": [],
+  "templates": []
+}
