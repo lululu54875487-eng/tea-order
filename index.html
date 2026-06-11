@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>部門下午茶訂單</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Department Order Desk</p>
+        <h1>部門下午茶訂單</h1>
+      </div>
+      <div class="status-pill" id="lockStatus">尚未鎖定</div>
+    </header>
+
+    <main class="app-shell">
+      <section class="workspace">
+        <div class="panel planner">
+          <div class="panel-heading">
+            <div>
+              <h2>今日店家</h2>
+              <p id="todayLabel"></p>
+            </div>
+            <button class="icon-button" id="resetBtn" type="button" title="清空今日資料" aria-label="清空今日資料">
+              <span aria-hidden="true">↺</span>
+            </button>
+          </div>
+
+          <label class="field">
+            <span>類型</span>
+            <select id="shopType">
+              <option value="drink">飲料</option>
+              <option value="meal">餐食</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>店家名稱</span>
+            <input id="shopName" type="text" placeholder="例如：50嵐、八方雲集、麥味登">
+          </label>
+
+          <div class="template-row" id="templateButtons"></div>
+
+          <label class="field">
+            <span>截止時間</span>
+            <input id="deadline" type="time">
+          </label>
+
+          <div class="actions">
+            <button class="primary" id="lockBtn" type="button">鎖定</button>
+            <button class="secondary" id="unlockBtn" type="button">解除</button>
+          </div>
+
+          <div class="share-box">
+            <label class="field">
+              <span>分享網址</span>
+              <input id="shareUrl" type="text" readonly>
+            </label>
+            <button class="secondary" id="copyShareBtn" type="button">複製網址</button>
+          </div>
+
+          <div class="share-box">
+            <label class="field">
+              <span>Google Apps Script URL</span>
+              <input id="gasUrl" type="url" placeholder="貼上 /exec 結尾的 Web App URL">
+            </label>
+            <div class="actions">
+              <button class="secondary" id="saveGasBtn" type="button">儲存串接</button>
+              <button class="secondary" id="clearGasBtn" type="button">清除</button>
+            </div>
+            <p class="helper" id="remoteStatus">目前使用瀏覽器暫存</p>
+          </div>
+        </div>
+
+        <div class="panel menu-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Menu</h2>
+              <p id="menuHint">輸入店家後會自動帶入菜單</p>
+            </div>
+            <button class="icon-button" id="addItemBtn" type="button" title="新增品項" aria-label="新增品項">
+              <span aria-hidden="true">＋</span>
+            </button>
+          </div>
+          <div class="menu-grid" id="menuGrid"></div>
+        </div>
+      </section>
+
+      <section class="workspace lower">
+        <div class="panel order-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>填寫訂單</h2>
+              <p id="orderShopLabel">請先鎖定今日店家</p>
+            </div>
+          </div>
+
+          <form id="orderForm">
+            <div class="form-grid">
+              <label class="field">
+                <span>訂購人</span>
+                <input id="customerName" type="text" required>
+              </label>
+              <label class="field">
+                <span>品項</span>
+                <select id="itemSelect" required></select>
+              </label>
+              <label class="field compact">
+                <span>數量</span>
+                <input id="quantity" type="number" min="1" value="1" required>
+              </label>
+              <label class="field drink-option">
+                <span>甜度</span>
+                <select id="sugar">
+                  <option>正常</option>
+                  <option>少糖</option>
+                  <option>半糖</option>
+                  <option>微糖</option>
+                  <option>無糖</option>
+                </select>
+              </label>
+              <label class="field drink-option">
+                <span>冰塊</span>
+                <select id="ice">
+                  <option>正常冰</option>
+                  <option>少冰</option>
+                  <option>微冰</option>
+                  <option>去冰</option>
+                  <option>熱</option>
+                </select>
+              </label>
+              <label class="field wide">
+                <span>備註</span>
+                <input id="note" type="text" placeholder="加料、辣度、不要香菜等">
+              </label>
+            </div>
+            <div class="actions">
+              <button class="primary" type="submit">送出訂單</button>
+              <button class="secondary" id="copyReturnBtn" type="button">複製回傳連結</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel summary-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>統籌清單</h2>
+              <p id="orderCount">0 筆訂單</p>
+            </div>
+            <button class="icon-button" id="exportBtn" type="button" title="匯出 CSV" aria-label="匯出 CSV">
+              <span aria-hidden="true">⇩</span>
+            </button>
+          </div>
+          <div class="import-row">
+            <input id="returnUrl" type="text" placeholder="貼上同事回傳連結">
+            <button class="secondary" id="importBtn" type="button">匯入</button>
+          </div>
+          <div class="orders" id="orders"></div>
+          <div class="totals" id="totals"></div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="itemDialog">
+      <form method="dialog" class="dialog-form">
+        <h2>新增品項</h2>
+        <label class="field">
+          <span>品項名稱</span>
+          <input id="newItemName" type="text">
+        </label>
+        <label class="field">
+          <span>價格</span>
+          <input id="newItemPrice" type="number" min="0">
+        </label>
+        <div class="actions">
+          <button class="secondary" value="cancel">取消</button>
+          <button class="primary" id="saveItemBtn" value="default">新增</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
